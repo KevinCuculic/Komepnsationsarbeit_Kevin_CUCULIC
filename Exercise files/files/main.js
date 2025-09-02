@@ -10,7 +10,10 @@ class ElementCreator {
     }
 
     class(clazz) {
-        this.element.class = clazz;
+        // EXPLAIN: In JS heißt die Property für CSS-Klassen "className".
+        // Das Skeleton hatte hier "class". Ich setze korrekt className,
+        // damit .class("...") zuverlässig funktioniert.
+        this.element.className = clazz;
         return this;
     }
 
@@ -60,7 +63,7 @@ class ElementCreator {
    You can (and probably should) rename this class to match with whatever name you
    used for your resource on the server-side.
  */
-class Resource {
+class Car {
 
     /* If you want to know more about this form of getters, read this:
      * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/get */
@@ -72,30 +75,46 @@ class Resource {
 
 function add(resource, sibling) {
 
-    const creator = new ElementCreator("article")
-        .id(resource.idforDOM);
+    const creator = new ElementCreator("article").id(resource.idforDOM);
 
     /* Task 2: Instead of the name property of the example resource, add the properties of
        your resource to the DOM. If you do not have the name property in your resource,
-       start by removing the h2 element that currently represents the name. For the 
+       start by removing the h2 element that currently represents the name. For the
        properties of your object you can use whatever html element you feel represents
-       your data best, e.g., h2, paragraphs, spans, ... 
+       your data best, e.g., h2, paragraphs, spans, ...
        Also, you don't have to use the ElementCreator if you don't want to and add the
        elements manually. */
 
+    // EXPLAIN (Task 2): Wir zeigen hier die drei Properties unserer Ressource Car:
+    // - brand (String), horsepower (Number), hasClutch (Boolean).
+    // Wir nutzen h2/p, du könntest aber auch <dl>, <span> oder eine Tabelle nehmen.
     creator
-        .append(new ElementCreator("h2").text(resource.name))
+        .append(new ElementCreator("h2").text(`${resource.brand} — ${resource.horsepower} PS`))
+        .append(new ElementCreator("p").text(`Kupplung: ${resource.hasClutch ? "Ja (Schaltgetriebe)" : "Nein (Automatik/E-Auto)"}`));
 
-    creator
-        .append(new ElementCreator("button").text("Edit").listener('click', () => {
-            edit(resource);
-        }))
-        .append(new ElementCreator("button").text("Remove").listener('click', () => {
-            /* Task 3: Call the delete endpoint asynchronously using either an XMLHttpRequest
-               or the Fetch API. Once the call returns successfully, remove the resource from
-               the DOM using the call to remove(...) below. */
-            remove(resource);  // <- This call removes the resource from the DOM. Call it after (and only if) your API call succeeds!
-        }));
+    // Edit-Button
+    creator.append(
+        new ElementCreator("button")
+            .text("Edit")
+            .listener("click", () => { edit(resource); })
+    );
+
+    // Remove-Button (Task 3: erst serverseitig löschen, dann DOM updaten)
+    // EXPLAIN (Task 3): Genau wie gefordert: Erst DELETE an die API senden.
+    // Wenn der Server OK antwortet, entfernen wir das Element aus dem DOM.
+    creator.append(
+        new ElementCreator("button")
+            .text("Remove")
+            .listener("click", async () => {
+                try {
+                    const res = await fetch(`/api/resources/${resource.id}`, { method: "DELETE" });
+                    if (!res.ok) throw new Error(`DELETE failed with ${res.status}`);
+                    remove(resource); // DOM NACH erfolgreichem DELETE
+                } catch (e) {
+                    alert("Löschen fehlgeschlagen: " + e.message);
+                }
+            })
+    );
 
     const parent = document.querySelector('main');
 
@@ -104,24 +123,34 @@ function add(resource, sibling) {
     } else {
         creator.insertBefore(parent, document.querySelector('#bottom'));
     }
-        
+
 }
 
 function edit(resource) {
     const formCreator = new ElementCreator("form")
         .id(resource.idforDOM)
-        .append(new ElementCreator("h3").text("Edit " + resource.name));
-    
+        .append(new ElementCreator("h3").text("Edit " + resource.brand));
+
     /* Task 4 - Part 1: Instead of the name property, add the properties your resource has here!
        The label and input element used here are just an example of how you can edit a
        property of a resource, in the case of our example property name this is a label and an
        input field. Also, we assign the input field a unique id attribute to be able to identify
-       it easily later when the user saves the edited data (see Task 4 - Part 2 below). 
+       it easily later when the user saves the edited data (see Task 4 - Part 2 below).
     */
 
+    // EXPLAIN (Task 4 - Part 1): Wir ersetzen das Beispiel "name" durch unsere Felder:
+    // brand (text), horsepower (number), hasClutch (checkbox).
     formCreator
-        .append(new ElementCreator("label").text("Name").with("for", "resource-name"))
-        .append(new ElementCreator("input").id("resource-name").with("type", "text").with("value", resource.name));
+        .append(new ElementCreator("label").text("Marke/Modell").with("for", "car-brand"))
+        .append(new ElementCreator("input").id("car-brand").with("type", "text").with("value", resource.brand))
+
+        // horsepower (Number)
+        .append(new ElementCreator("label").text("PS").with("for", "car-hp"))
+        .append(new ElementCreator("input").id("car-hp").with("type", "number").with("value", resource.horsepower))
+
+        // hasClutch (Boolean)
+        .append(new ElementCreator("label").text("Kupplung vorhanden?").with("for", "car-clutch"))
+        .append(new ElementCreator("input").id("car-clutch").with("type", "checkbox").with("checked", resource.hasClutch ? "checked" : null));
 
     /* In the end, we add the code to handle saving the resource on the server and terminating edit mode */
     formCreator
@@ -130,17 +159,32 @@ function edit(resource) {
             event.preventDefault();
 
             /* The user saves the resource.
-               Task 4 - Part 2: We manually set the edited values from the input elements to the resource object. 
+               Task 4 - Part 2: We manually set the edited values from the input elements to the resource object.
                Again, this code here is just an example of how the name of our example resource can be obtained
                and set in to the resource. The idea is that you handle your own properties here.
             */
-            resource.name = document.getElementById("resource-name").value;
+
+            // EXPLAIN (Task 4 - Part 2): Hier mappen wir die Formularwerte zurück ins Objekt.
+            resource.brand = document.getElementById("car-brand").value.trim();
+            resource.horsepower = Number(document.getElementById("car-hp").value);
+            resource.hasClutch = document.getElementById("car-clutch").checked;
 
             /* Task 4 - Part 3: Call the update endpoint asynchronously. Once the call returns successfully,
-               use the code below to remove the form we used for editing and again render 
+               use the code below to remove the form we used for editing and again render
                the resource in the list.
             */
-            add(resource, document.getElementById(resource.idforDOM));  // <- Call this after the resource is updated successfully on the server
+
+            // EXPLAIN (Task 4 - Part 3): PUT an /api/resources/:id schicken. Bei Erfolg: Formular -> Ansicht.
+            fetch(`/api/resources/${resource.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(resource),
+            })
+                .then(res => {
+                    if (!res.ok) throw new Error(`PUT failed with ${res.status}`);
+                    add(resource, document.getElementById(resource.idforDOM));  // <- Call this after the resource is updated successfully on the server
+                })
+                .catch(err => alert("Speichern fehlgeschlagen: " + err.message));
         }))
         .replace(document.querySelector('main'), document.getElementById(resource.idforDOM));
 }
@@ -156,9 +200,59 @@ function remove(resource) {
     one that contains an id).
  */
 function create() {
-    alert("Not implemeted yet!");
+    // EXPLAIN (Task 5): Create ist wie Edit, nur dass wir POST verwenden und
+    // das vom Server zurückgelieferte Objekt (mit id) rendern.
+
+    // Doppelte Create-Forms vermeiden
+    if (document.getElementById("create-form")) return;
+
+    const formCreator = new ElementCreator("form")
+        .id("create-form")
+        .append(new ElementCreator("h3").text("Neues Auto anlegen"))
+
+        // brand
+        .append(new ElementCreator("label").text("Marke/Modell").with("for", "new-brand"))
+        .append(new ElementCreator("input").id("new-brand").with("type", "text"))
+
+        // horsepower
+        .append(new ElementCreator("label").text("PS").with("for", "new-hp"))
+        .append(new ElementCreator("input").id("new-hp").with("type", "number").with("value", 100))
+
+        // hasClutch
+        .append(new ElementCreator("label").text("Kupplung vorhanden?").with("for", "new-clutch"))
+        .append(new ElementCreator("input").id("new-clutch").with("type", "checkbox"))
+
+        // POST
+        .append(new ElementCreator("button").text("Anlegen").listener("click", (e) => {
+            e.preventDefault();
+
+            const payload = {
+                brand: document.getElementById("new-brand").value.trim(),
+                horsepower: Number(document.getElementById("new-hp").value),
+                hasClutch: document.getElementById("new-clutch").checked,
+            };
+
+            fetch("/api/resources", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            })
+                .then(res => {
+                    if (!res.ok) throw new Error(`POST failed with ${res.status}`);
+                    return res.json();
+                })
+                .then(created => {
+                    // EXPLAIN: Der Server vergibt die id. Wir mappen auf Car-Instanz und rendern.
+                    add(Object.assign(new Car(), created));
+                    document.getElementById("create-form").remove();
+                })
+                .catch(err => alert("Anlegen fehlgeschlagen: " + err.message));
+        }));
+
+    // Formular oberhalb von #bottom einfügen (analog zu add(...))
+    formCreator.insertBefore(document.querySelector("main"), document.querySelector("#bottom"));
 }
-    
+
 
 document.addEventListener("DOMContentLoaded", function (event) {
 
@@ -166,8 +260,20 @@ document.addEventListener("DOMContentLoaded", function (event) {
         .then(response => response.json())
         .then(resources => {
             for (const resource of resources) {
-                add(Object.assign(new Resource(), resource));
+                // EXPLAIN: Mapping der JSON-Objekte (plain) auf unsere Client-Klasse Car,
+                // damit Getter (idforDOM) usw. funktionieren.
+                add(Object.assign(new Car(), resource));
             }
-        });
-});
+        })
+        .catch(err => alert("Laden fehlgeschlagen: " + err.message));
 
+    // EXPLAIN: Falls kein Create-Button in der HTML ist, fügen wir hier einen hinzu.
+    const main = document.querySelector('main');
+    if (main && !document.getElementById('create-button')) {
+        new ElementCreator('button')
+            .id('create-button')
+            .text('Create')
+            .listener('click', () => create())
+            .insertBefore(main, document.querySelector('#bottom'));
+    }
+});
