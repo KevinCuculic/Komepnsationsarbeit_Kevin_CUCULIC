@@ -10,6 +10,11 @@ const port = process.env.PORT ?? 3000;
 // Serving static files from folder 'files'
 app.use(express.static(path.join(__dirname, 'files')));
 
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./api/swagger');
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, { explorer: true }));
+
+
 // Parse JSON bodies (from requests)
 app.use(bodyParser.json()); 
 
@@ -20,7 +25,7 @@ app.listen(port, (error) => {
     if (error) {
         console.log(error);
     } else {
-        console.log(`Server listening at http://localhost:${port}`)
+        console.log(`Server startet unter http://localhost:${port}`)
     }
 });
 

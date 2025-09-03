@@ -10,9 +10,7 @@ class ElementCreator {
     }
 
     class(clazz) {
-        // EXPLAIN: In JS heißt die Property für CSS-Klassen "className".
-        // Das Skeleton hatte hier "class". Ich setze korrekt className,
-        // damit .class("...") zuverlässig funktioniert.
+
         this.element.className = clazz;
         return this;
     }
@@ -68,7 +66,7 @@ class Car {
     /* If you want to know more about this form of getters, read this:
      * https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/get */
     get idforDOM() {
-        return `resource-${this.id}`;
+        return `cars-${this.id}`;
     }
 
 }
@@ -85,9 +83,6 @@ function add(resource, sibling) {
        Also, you don't have to use the ElementCreator if you don't want to and add the
        elements manually. */
 
-    // EXPLAIN (Task 2): Wir zeigen hier die drei Properties unserer Ressource Car:
-    // - brand (String), horsepower (Number), hasClutch (Boolean).
-    // Wir nutzen h2/p, du könntest aber auch <dl>, <span> oder eine Tabelle nehmen.
     creator
         .append(new ElementCreator("h2").text(`${resource.brand} — ${resource.horsepower} PS`))
         .append(new ElementCreator("p").text(`Kupplung: ${resource.hasClutch ? "Ja (Schaltgetriebe)" : "Nein (Automatik/E-Auto)"}`));
@@ -100,16 +95,15 @@ function add(resource, sibling) {
     );
 
     // Remove-Button (Task 3: erst serverseitig löschen, dann DOM updaten)
-    // EXPLAIN (Task 3): Genau wie gefordert: Erst DELETE an die API senden.
-    // Wenn der Server OK antwortet, entfernen wir das Element aus dem DOM.
+
     creator.append(
         new ElementCreator("button")
             .text("Remove")
             .listener("click", async () => {
                 try {
-                    const res = await fetch(`/api/resources/${resource.id}`, { method: "DELETE" });
+                    const res = await fetch(`/api/cars/${resource.id}`, { method: "DELETE" });
                     if (!res.ok) throw new Error(`DELETE failed with ${res.status}`);
-                    remove(resource); // DOM NACH erfolgreichem DELETE
+                    remove(resource); // DOM nach Delete
                 } catch (e) {
                     alert("Löschen fehlgeschlagen: " + e.message);
                 }
@@ -138,8 +132,6 @@ function edit(resource) {
        it easily later when the user saves the edited data (see Task 4 - Part 2 below).
     */
 
-    // EXPLAIN (Task 4 - Part 1): Wir ersetzen das Beispiel "name" durch unsere Felder:
-    // brand (text), horsepower (number), hasClutch (checkbox).
     formCreator
         .append(new ElementCreator("label").text("Marke/Modell").with("for", "car-brand"))
         .append(new ElementCreator("input").id("car-brand").with("type", "text").with("value", resource.brand))
@@ -155,7 +147,8 @@ function edit(resource) {
     /* In the end, we add the code to handle saving the resource on the server and terminating edit mode */
     formCreator
         .append(new ElementCreator("button").text("Speichern").listener('click', (event) => {
-            /* Why do we have to prevent the default action? Try commenting this line. */
+            /* Why do we have to prevent the default action? Try commenting this line.
+            *Ohne dem würden man nie den asynchronen Code ausführen sondern immer die Default Page laden */
             event.preventDefault();
 
             /* The user saves the resource.
@@ -164,7 +157,6 @@ function edit(resource) {
                and set in to the resource. The idea is that you handle your own properties here.
             */
 
-            // EXPLAIN (Task 4 - Part 2): Hier mappen wir die Formularwerte zurück ins Objekt.
             resource.brand = document.getElementById("car-brand").value.trim();
             resource.horsepower = Number(document.getElementById("car-hp").value);
             resource.hasClutch = document.getElementById("car-clutch").checked;
@@ -174,8 +166,7 @@ function edit(resource) {
                the resource in the list.
             */
 
-            // EXPLAIN (Task 4 - Part 3): PUT an /api/resources/:id schicken. Bei Erfolg: Formular -> Ansicht.
-            fetch(`/api/resources/${resource.id}`, {
+            fetch(`/api/cars/${resource.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(resource),
@@ -200,10 +191,7 @@ function remove(resource) {
     one that contains an id).
  */
 function create() {
-    // EXPLAIN (Task 5): Create ist wie Edit, nur dass wir POST verwenden und
-    // das vom Server zurückgelieferte Objekt (mit id) rendern.
 
-    // Doppelte Create-Forms vermeiden
     if (document.getElementById("create-form")) return;
 
     const formCreator = new ElementCreator("form")
@@ -232,7 +220,7 @@ function create() {
                 hasClutch: document.getElementById("new-clutch").checked,
             };
 
-            fetch("/api/resources", {
+            fetch("/api/cars", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
@@ -256,7 +244,7 @@ function create() {
 
 document.addEventListener("DOMContentLoaded", function (event) {
 
-    fetch("/api/resources")
+    fetch("/api/cars")
         .then(response => response.json())
         .then(resources => {
             for (const resource of resources) {
@@ -266,14 +254,4 @@ document.addEventListener("DOMContentLoaded", function (event) {
             }
         })
         .catch(err => alert("Laden fehlgeschlagen: " + err.message));
-
-    // EXPLAIN: Falls kein Create-Button in der HTML ist, fügen wir hier einen hinzu.
-    const main = document.querySelector('main');
-    if (main && !document.getElementById('create-button')) {
-        new ElementCreator('button')
-            .id('create-button')
-            .text('Create')
-            .listener('click', () => create())
-            .insertBefore(main, document.querySelector('#bottom'));
-    }
 });
